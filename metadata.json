@@ -1,0 +1,6 @@
+{
+  "name": "Calculadora de Dr Martin W.",
+  "description": "Calculadora profesional de bioquímica y laboratorio clínico de Dr Martin W. con 15 especialidades, fórmulas médicas estandarizadas, conversor de unidades e informes clínicos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
