@@ -17,60 +17,94 @@ export const HEMATOLOGY_CALCULATORS: FormulaDefinition[] = [
       { id: 'gr', name: 'Glóbulos Rojos (Eritrocitos)', symbol: 'GR', unit: '×10⁶/µL (millones/mm³)', defaultValue: 4.80, min: 0.5, max: 10, step: 0.01 }
     ],
     calculate: (inputs) => {
-      const hb = Number(inputs.hb);
-      const hto = Number(inputs.hto);
-      const gr = Number(inputs.gr);
+      try {
+        const hb = typeof inputs.hb === 'number' ? inputs.hb : parseFloat(String(inputs.hb ?? '').replace(',', '.'));
+        const hto = typeof inputs.hto === 'number' ? inputs.hto : parseFloat(String(inputs.hto ?? '').replace(',', '.'));
+        const gr = typeof inputs.gr === 'number' ? inputs.gr : parseFloat(String(inputs.gr ?? '').replace(',', '.'));
 
-      if (!hb || !hto || !gr || gr <= 0 || hto <= 0) {
-        return {
-          results: [],
-          interpretation: 'Ingrese valores válidos para Hemoglobina, Hematocrito y Glóbulos Rojos.'
-        };
-      }
+        if (isNaN(hb) || isNaN(hto) || isNaN(gr) || hb <= 0 || hto <= 0 || gr <= 0) {
+          return {
+            results: [],
+            interpretation: 'Ingrese valores numéricos válidos para Hemoglobina (g/dL), Hematocrito (%) y Glóbulos Rojos (×10⁶/µL).'
+          };
+        }
 
-      const vcm = Number(((hto * 10) / gr).toFixed(1));
-      const hcm = Number(((hb * 10) / gr).toFixed(1));
-      const chcm = Number(((hb * 100) / hto).toFixed(1));
+        const vcm = Number(((hto * 10) / gr).toFixed(1));
+        const hcm = Number(((hb * 10) / gr).toFixed(1));
+        const chcm = Number(((hb * 100) / hto).toFixed(1));
+        const mentzer = Number((hto / gr).toFixed(2));
 
-      let vcmStatus: 'low' | 'normal' | 'high' = 'normal';
-      let vcmLabel = 'Normocitosis (80-100 fL)';
-      if (vcm < 80) { vcmStatus = 'low'; vcmLabel = 'Microcitosis (< 80 fL)'; }
-      else if (vcm > 100) { vcmStatus = 'high'; vcmLabel = 'Macrocitosis (> 100 fL)'; }
+        let vcmStatus: 'low' | 'normal' | 'high' = 'normal';
+        let vcmLabel = 'Normocitosis (80 - 100 fL)';
+        if (vcm < 80) { vcmStatus = 'low'; vcmLabel = 'Microcitosis (< 80 fL)'; }
+        else if (vcm > 100) { vcmStatus = 'high'; vcmLabel = 'Macrocitosis (> 100 fL)'; }
 
-      let hcmStatus: 'low' | 'normal' | 'high' = 'normal';
-      let hcmLabel = 'Normocromía (27-33 pg)';
-      if (hcm < 27) { hcmStatus = 'low'; hcmLabel = 'Hipocromía (< 27 pg)'; }
-      else if (hcm > 33) { hcmStatus = 'high'; hcmLabel = 'Hipercromía (> 33 pg)'; }
+        let hcmStatus: 'low' | 'normal' | 'high' = 'normal';
+        let hcmLabel = 'Normocromía (27 - 33 pg)';
+        if (hcm < 27) { hcmStatus = 'low'; hcmLabel = 'Hipocromía (< 27 pg)'; }
+        else if (hcm > 33) { hcmStatus = 'high'; hcmLabel = 'Hipercromía (> 33 pg)'; }
 
-      let chcmStatus: 'low' | 'normal' | 'high' = 'normal';
-      let chcmLabel = 'Normal (32-36 g/dL)';
-      if (chcm < 32) { chcmStatus = 'low'; chcmLabel = 'Hipocromía (< 32 g/dL)'; }
-      else if (chcm > 36) { chcmStatus = 'high'; chcmLabel = 'Esferocitosis / Crioaglutininas (> 36 g/dL)'; }
+        let chcmStatus: 'low' | 'normal' | 'high' = 'normal';
+        let chcmLabel = 'Normal (32 - 36 g/dL)';
+        if (chcm < 32) { chcmStatus = 'low'; chcmLabel = 'Hipocromía (< 32 g/dL)'; }
+        else if (chcm > 36) { chcmStatus = 'high'; chcmLabel = 'Esferocitosis / Crioaglutininas (> 36 g/dL)'; }
 
-      let conclusion = '';
-      if (vcm < 80 && hcm < 27) {
-        conclusion = 'Patrón Microcítico Hipocrómico: Sugiere Anemia Ferropénica, Talasemia menor o Anemia de Enfermedades Crónicas en fase tardía.';
-      } else if (vcm > 100) {
-        conclusion = 'Patrón Macrocítico: Sugiere déficit de Vitamina B12 o Ácido Fólico (Megaloblástica), hepatopatía, hipotiroidismo o reticulocitosis marcada.';
-      } else if (vcm >= 80 && vcm <= 100 && hcm >= 27) {
-        conclusion = 'Patrón Normocítico Normocrómico: Sugiere Anemia de Enfermedades Crónicas, hemorragia aguda, anemia hemolítica o aplasia medular.';
-      } else {
-        conclusion = 'Índices dentro de rangos normales de referencia.';
-      }
+        let mentzerNote = '';
+        if (vcm < 80) {
+          if (mentzer < 13) {
+            mentzerNote = `\n• Índice de Mentzer = ${mentzer} (< 13): Orienta fuertemente a Rasgo de Beta-Talasemia Menor (microcitosis con abundante número de hematíes).`;
+          } else {
+            mentzerNote = `\n• Índice de Mentzer = ${mentzer} (≥ 13): Orienta fuertemente a Anemia Ferropénica (déficit de hierro).`;
+          }
+        }
 
-      return {
-        results: [
+        let conclusion = '';
+        if (vcm < 80 && hcm < 27) {
+          conclusion = `Patrón Microcítico Hipocrómico: Sugiere Anemia Ferropénica, Talasemia Menor o Anemia de Procesos Crónicos.${mentzerNote}`;
+        } else if (vcm < 80 && hcm >= 27) {
+          conclusion = `Patrón Microcítico Normocrómico: Microcitosis temprana o rasgo hemoglobinopático.${mentzerNote}`;
+        } else if (vcm > 100) {
+          conclusion = 'Patrón Macrocítico: Sugiere déficit de Vitamina B12 o Ácido Fólico (Megaloblástica), hepatopatía crónica, hipotiroidismo, alcoholismo o reticulocitosis intensa.';
+        } else if (hcm < 27) {
+          conclusion = 'Patrón Normocítico Hipocrómico: Sugiere ferropenia incipiente o hemoglobinopatía heterocigota.';
+        } else {
+          conclusion = 'Patrón Normocítico Normocrómico: Índices eritrocitarios dentro de los rangos biológicos de referencia.';
+        }
+
+        const results = [
           { id: 'vcm', name: 'Volumen Corpuscular Medio (VCM)', value: vcm, unit: 'fL', referenceRange: '80.0 - 100.0 fL', status: vcmStatus, statusLabel: vcmLabel },
           { id: 'hcm', name: 'Hemoglobina Corpuscular Media (HCM)', value: hcm, unit: 'pg', referenceRange: '27.0 - 33.0 pg', status: hcmStatus, statusLabel: hcmLabel },
           { id: 'chcm', name: 'Concentración de Hb Corpuscular Media (CHCM)', value: chcm, unit: 'g/dL', referenceRange: '32.0 - 36.0 g/dL', status: chcmStatus, statusLabel: chcmLabel }
-        ],
-        interpretation: conclusion,
-        steps: [
-          `VCM = (${hto} × 10) / ${gr} = ${vcm} fL`,
-          `HCM = (${hb} × 10) / ${gr} = ${hcm} pg`,
-          `CHCM = (${hb} × 100) / ${hto} = ${chcm} g/dL`
-        ]
-      };
+        ];
+
+        if (vcm < 80) {
+          results.push({
+            id: 'mentzer',
+            name: 'Índice de Mentzer (Hto/GR)',
+            value: mentzer,
+            unit: 'índice',
+            referenceRange: '< 13: Talasemia | ≥ 13: Ferropenia',
+            status: mentzer < 13 ? 'normal' : 'low',
+            statusLabel: mentzer < 13 ? 'Probable Talasemia (< 13)' : 'Probable Ferropenia (≥ 13)'
+          });
+        }
+
+        return {
+          results,
+          interpretation: conclusion,
+          steps: [
+            `VCM = (${hto} × 10) / ${gr} = ${vcm} fL`,
+            `HCM = (${hb} × 10) / ${gr} = ${hcm} pg`,
+            `CHCM = (${hb} × 100) / ${hto} = ${chcm} g/dL`,
+            ...(vcm < 80 ? [`Índice de Mentzer = ${hto} / ${gr} = ${mentzer}`] : [])
+          ]
+        };
+      } catch (err) {
+        return {
+          results: [],
+          interpretation: 'Ingrese valores numéricos válidos en los campos de entrada.'
+        };
+      }
     }
   },
   {
@@ -89,56 +123,55 @@ export const HEMATOLOGY_CALCULATORS: FormulaDefinition[] = [
       { id: 'hto_normal', name: 'Hematocrito normal de referencia', symbol: 'Hto Ref', unit: '%', defaultValue: 45.0, min: 35, max: 50, step: 1 }
     ],
     calculate: (inputs) => {
-      const reticPct = Number(inputs.retic_pct);
-      const hto = Number(inputs.hto);
-      const htoNormal = Number(inputs.hto_normal) || 45;
+      try {
+        const reticPct = typeof inputs.retic_pct === 'number' ? inputs.retic_pct : parseFloat(String(inputs.retic_pct ?? '').replace(',', '.'));
+        const hto = typeof inputs.hto === 'number' ? inputs.hto : parseFloat(String(inputs.hto ?? '').replace(',', '.'));
+        const htoNormal = (typeof inputs.hto_normal === 'number' ? inputs.hto_normal : parseFloat(String(inputs.hto_normal ?? '').replace(',', '.'))) || 45;
 
-      if (!reticPct || !hto) {
-        return { results: [], interpretation: 'Complete los datos de reticulocitos y hematocrito.' };
+        if (isNaN(reticPct) || isNaN(hto) || reticPct <= 0 || hto <= 0 || htoNormal <= 0) {
+          return { results: [], interpretation: 'Complete los datos de reticulocitos y hematocrito.' };
+        }
+
+        const reticCorregido = Number((reticPct * (hto / htoNormal)).toFixed(2));
+
+        let factorMaduracion = 1.0;
+        if (hto >= 36) factorMaduracion = 1.0;
+        else if (hto >= 26) factorMaduracion = 1.5;
+        else if (hto >= 16) factorMaduracion = 2.0;
+        else factorMaduracion = 2.5;
+
+        const ipr = Number((reticCorregido / factorMaduracion).toFixed(2));
+
+        let iprStatus: 'low' | 'normal' | 'high' = 'normal';
+        let iprLabel = '';
+        let interpretation = '';
+
+        if (ipr >= 2.0) {
+          iprStatus = 'high';
+          iprLabel = 'Anemia Regenerativa (IPR ≥ 2.0)';
+          interpretation = 'Médula ósea con excelente respuesta hiperproliferativa. Típico de hemorragia aguda reciente o hemólisis activa.';
+        } else {
+          iprStatus = 'low';
+          iprLabel = 'Anemia Arregenerativa / Hipoproliferativa (IPR < 2.0)';
+          interpretation = 'Respuesta eritropoyética medular inadecuada para el grado de anemia. Sugiere ferropenia, déficit de B12/folato, aplasia medular, síndrome mielodisplásico o insuficiencia renal (déficit de EPO).';
+        }
+
+        return {
+          results: [
+            { id: 'retic_corr', name: 'Reticulocitos Corregidos', value: reticCorregido, unit: '%', referenceRange: '1.0 - 2.0 %', status: reticCorregido < 1 ? 'low' : 'normal' },
+            { id: 'maduracion', name: 'Tiempo de Maduración en sangre periférica', value: factorMaduracion, unit: 'días', referenceRange: '1.0 - 2.5 días' },
+            { id: 'ipr', name: 'Índice de Producción Reticulocitaria (IPR)', value: ipr, unit: 'índice', referenceRange: '> 2.0 en anemia', status: iprStatus, statusLabel: iprLabel }
+          ],
+          interpretation,
+          steps: [
+            `% Retic Corregido = ${reticPct}% × (${hto}% / ${htoNormal}%) = ${reticCorregido}%`,
+            `Factor de maduración para Hto ${hto}% = ${factorMaduracion} días`,
+            `IPR = ${reticCorregido}% / ${factorMaduracion} = ${ipr}`
+          ]
+        };
+      } catch (err) {
+        return { results: [], interpretation: 'Ingrese valores numéricos válidos.' };
       }
-
-      const reticCorregido = Number((reticPct * (hto / htoNormal)).toFixed(2));
-
-      // Factor de maduración según hematocrito:
-      // Hto >= 36% -> 1.0 día
-      // Hto 26-35% -> 1.5 días
-      // Hto 16-25% -> 2.0 días
-      // Hto < 16%  -> 2.5 días
-      let factorMaduracion = 1.0;
-      if (hto >= 36) factorMaduracion = 1.0;
-      else if (hto >= 26) factorMaduracion = 1.5;
-      else if (hto >= 16) factorMaduracion = 2.0;
-      else factorMaduracion = 2.5;
-
-      const ipr = Number((reticCorregido / factorMaduracion).toFixed(2));
-
-      let iprStatus: 'low' | 'normal' | 'high' = 'normal';
-      let iprLabel = '';
-      let interpretation = '';
-
-      if (ipr >= 2.0) {
-        iprStatus = 'high';
-        iprLabel = 'Anemia Regenerativa (IPR ≥ 2.0)';
-        interpretation = 'Médula ósea con excelente respuesta hiperproliferativa. Típico de hemorragia aguda reciente o hemólisis activa.';
-      } else {
-        iprStatus = 'low';
-        iprLabel = 'Anemia Arregenerativa / Hipoproliferativa (IPR < 2.0)';
-        interpretation = 'Respuesta eritropoyética medular inadecuada para el grado de anemia. Sugiere ferropenia, déficit de B12/folato, aplasia medular, síndrome mielodisplásico o insuficiencia renal (déficit de EPO).';
-      }
-
-      return {
-        results: [
-          { id: 'retic_corr', name: 'Reticulocitos Corregidos', value: reticCorregido, unit: '%', referenceRange: '1.0 - 2.0 %', status: reticCorregido < 1 ? 'low' : 'normal' },
-          { id: 'maduracion', name: 'Tiempo de Maduración en sangre periférica', value: factorMaduracion, unit: 'días', referenceRange: '1.0 - 2.5 días' },
-          { id: 'ipr', name: 'Índice de Producción Reticulocitaria (IPR)', value: ipr, unit: 'índice', referenceRange: '> 2.0 en anemia', status: iprStatus, statusLabel: iprLabel }
-        ],
-        interpretation,
-        steps: [
-          `% Retic Corregido = ${reticPct}% × (${hto}% / ${htoNormal}%) = ${reticCorregido}%`,
-          `Factor de maduración para Hto ${hto}% = ${factorMaduracion} días`,
-          `IPR = ${reticCorregido}% / ${factorMaduracion} = ${ipr}`
-        ]
-      };
     }
   },
   {
@@ -156,26 +189,30 @@ export const HEMATOLOGY_CALCULATORS: FormulaDefinition[] = [
       { id: 'eritroblastos', name: 'Eritroblastos (por 100 leucocitos en frotis)', symbol: 'NRBC/100 WBC', unit: '/100 leucos', defaultValue: 15, min: 1, max: 300, step: 1 }
     ],
     calculate: (inputs) => {
-      const raw = Number(inputs.leucos_raw);
-      const nrbc = Number(inputs.eritroblastos);
+      try {
+        const raw = typeof inputs.leucos_raw === 'number' ? inputs.leucos_raw : parseFloat(String(inputs.leucos_raw ?? '').replace(',', '.'));
+        const nrbc = typeof inputs.eritroblastos === 'number' ? inputs.eritroblastos : parseFloat(String(inputs.eritroblastos ?? '').replace(',', '.'));
 
-      if (!raw || nrbc === undefined) {
-        return { results: [], interpretation: 'Ingrese el recuento automatizado y el número de eritroblastos.' };
+        if (isNaN(raw) || isNaN(nrbc) || raw <= 0 || nrbc < 0) {
+          return { results: [], interpretation: 'Ingrese el recuento automatizado y el número de eritroblastos.' };
+        }
+
+        const corrected = Math.round((raw * 100) / (100 + nrbc));
+        const difference = raw - corrected;
+
+        return {
+          results: [
+            { id: 'corrected_wbc', name: 'Leucocitos Reales Corregidos', value: corrected, unit: '/µL', referenceRange: '4,500 - 11,000 /µL', status: corrected > 11000 ? 'high' : corrected < 4500 ? 'low' : 'normal' },
+            { id: 'excess', name: 'Glóbulos nucleados sobreestimados', value: difference, unit: '/µL', status: 'normal', statusLabel: 'Células descontadas' }
+          ],
+          interpretation: `El recuento real del paciente es de ${corrected.toLocaleString()} leucocitos/µL. El analizador estaba sobreestimando ${difference.toLocaleString()} células/µL debido a la presencia de eritroblastos nucleados en sangre periférica.`,
+          steps: [
+            `Leucocitos Corregidos = (${raw} × 100) / (100 + ${nrbc}) = ${corrected} /µL`
+          ]
+        };
+      } catch (err) {
+        return { results: [], interpretation: 'Ingrese valores numéricos válidos.' };
       }
-
-      const corrected = Math.round((raw * 100) / (100 + nrbc));
-      const difference = raw - corrected;
-
-      return {
-        results: [
-          { id: 'corrected_wbc', name: 'Leucocitos Reales Corregidos', value: corrected, unit: '/µL', referenceRange: '4,500 - 11,000 /µL', status: corrected > 11000 ? 'high' : corrected < 4500 ? 'low' : 'normal' },
-          { id: 'excess', name: 'Glóbulos nucleados sobreestimados', value: difference, unit: '/µL', status: 'info' }
-        ],
-        interpretation: `El recuento real del paciente es de ${corrected.toLocaleString()} leucocitos/µL. El analizador estaba sobreestimando ${difference.toLocaleString()} células/µL debido a la presencia de eritroblastos nucleados en sangre periférica.`,
-        steps: [
-          `Leucocitos Corregidos = (${raw} × 100) / (100 + ${nrbc}) = ${corrected} /µL`
-        ]
-      };
     }
   },
   {
@@ -194,28 +231,32 @@ export const HEMATOLOGY_CALCULATORS: FormulaDefinition[] = [
       { id: 'dilution', name: 'Factor de Dilución (ej. 1:20 = 20, directa = 1)', symbol: 'FD', unit: 'dilución', defaultValue: 20, min: 1, max: 1000, step: 1 }
     ],
     calculate: (inputs) => {
-      const count = Number(inputs.cells_counted);
-      const squares = Number(inputs.squares);
-      const dilution = Number(inputs.dilution);
+      try {
+        const count = typeof inputs.cells_counted === 'number' ? inputs.cells_counted : parseFloat(String(inputs.cells_counted ?? '').replace(',', '.'));
+        const squares = typeof inputs.squares === 'number' ? inputs.squares : parseFloat(String(inputs.squares ?? '').replace(',', '.'));
+        const dilution = typeof inputs.dilution === 'number' ? inputs.dilution : parseFloat(String(inputs.dilution ?? '').replace(',', '.'));
 
-      if (!count || !squares || !dilution) {
-        return { results: [], interpretation: 'Complete los parámetros de la cámara de Neubauer.' };
+        if (isNaN(count) || isNaN(squares) || isNaN(dilution) || count < 0 || squares <= 0 || dilution <= 0) {
+          return { results: [], interpretation: 'Complete los parámetros de la cámara de Neubauer.' };
+        }
+
+        const concentration = Math.round((count * dilution) / (squares * 0.1));
+        const concentrationSI = Number((concentration / 1000).toFixed(2));
+
+        return {
+          results: [
+            { id: 'concentration_ul', name: 'Concentración Celular', value: concentration, unit: 'células/µL (o mm³)', status: 'normal', statusLabel: 'Recuento directo' },
+            { id: 'concentration_l', name: 'Concentración Celular (SI)', value: concentrationSI, unit: '×10⁶/L', status: 'normal', statusLabel: 'Sistema Internacional' }
+          ],
+          interpretation: `Concentración obtenida: ${concentration.toLocaleString()} células/µL (mm³). Recuerde verificar la regla de inclusión de bordes (contar células en bordes superior e izquierdo, omitir en inferior y derecho).`,
+          steps: [
+            `Volumen total evaluado = ${squares} cuadrantes × 0.1 mm³ = ${(squares * 0.1).toFixed(2)} mm³`,
+            `Células/µL = (${count} × ${dilution}) / ${(squares * 0.1).toFixed(2)} = ${concentration.toLocaleString()} células/µL`
+          ]
+        };
+      } catch (err) {
+        return { results: [], interpretation: 'Ingrese valores numéricos válidos.' };
       }
-
-      // Volumen por cuadrante grande = 1 mm * 1 mm * 0.1 mm = 0.1 mm³ (0.1 µL)
-      const concentration = Math.round((count * dilution) / (squares * 0.1));
-
-      return {
-        results: [
-          { id: 'concentration_ul', name: 'Concentración Celular', value: concentration, unit: 'células/µL (o mm³)', status: 'info' },
-          { id: 'concentration_l', name: 'Concentración Celular (SI)', value: (concentration / 1000).toFixed(2), unit: '×10⁶/L', status: 'info' }
-        ],
-        interpretation: `Concentración obtenida: ${concentration.toLocaleString()} células/µL (mm³). Recuerde verificar la regla de inclusión de bordes (contar células en bordes superior e izquierdo, omitir en inferior y derecho).`,
-        steps: [
-          `Volumen total evaluado = ${squares} cuadrantes × 0.1 mm³ = ${(squares * 0.1).toFixed(2)} mm³`,
-          `Células/µL = (${count} × ${dilution}) / ${(squares * 0.1).toFixed(2)} = ${concentration.toLocaleString()} células/µL`
-        ]
-      };
     }
   },
   {
@@ -234,45 +275,49 @@ export const HEMATOLOGY_CALCULATORS: FormulaDefinition[] = [
       { id: 'platelets', name: 'Plaquetas totales', symbol: 'PLT', unit: '/µL', defaultValue: 250000, min: 5000, max: 1500000, step: 1000 }
     ],
     calculate: (inputs) => {
-      const neu = Number(inputs.neutrophils);
-      const linf = Number(inputs.lymphocytes);
-      const plt = Number(inputs.platelets);
+      try {
+        const neu = typeof inputs.neutrophils === 'number' ? inputs.neutrophils : parseFloat(String(inputs.neutrophils ?? '').replace(',', '.'));
+        const linf = typeof inputs.lymphocytes === 'number' ? inputs.lymphocytes : parseFloat(String(inputs.lymphocytes ?? '').replace(',', '.'));
+        const plt = typeof inputs.platelets === 'number' ? inputs.platelets : parseFloat(String(inputs.platelets ?? '').replace(',', '.'));
 
-      if (!neu || !linf || linf <= 0) {
-        return { results: [], interpretation: 'Ingrese los neutrófilos y linfocitos.' };
+        if (isNaN(neu) || isNaN(linf) || neu < 0 || linf <= 0) {
+          return { results: [], interpretation: 'Ingrese los neutrófilos y linfocitos.' };
+        }
+
+        const nlr = Number((neu / linf).toFixed(2));
+        const plr = (!isNaN(plt) && plt > 0) ? Number((plt / linf).toFixed(1)) : 0;
+
+        let nlrStatus: 'normal' | 'high' | 'critical-high' = 'normal';
+        let nlrLabel = 'Normal (< 3.0)';
+        let interp = '';
+
+        if (nlr < 3.0) {
+          nlrStatus = 'normal';
+          interp = 'NLR normal: Sin evidencia de respuesta inflamatoria sistémica marcada.';
+        } else if (nlr <= 6.0) {
+          nlrStatus = 'high';
+          nlrLabel = 'Inflamación Leve a Moderada (3.0 - 6.0)';
+          interp = 'NLR moderadamente elevado: Sugiere estrés fisiológico, infección bacteriana o inflamación sistémica activa.';
+        } else {
+          nlrStatus = 'critical-high';
+          nlrLabel = 'Inflamación Severa / Alto Riesgo (> 6.0)';
+          interp = 'NLR marcadamente elevado: Alto riesgo de sepsis, tormenta de citoquinas o descompensación crítica.';
+        }
+
+        return {
+          results: [
+            { id: 'nlr', name: 'Relación Neutrófilo/Linfocito (NLR)', value: nlr, unit: 'ratio', referenceRange: '1.0 - 3.0', status: nlrStatus, statusLabel: nlrLabel },
+            { id: 'plr', name: 'Relación Plaqueta/Linfocito (PLR)', value: plr, unit: 'ratio', referenceRange: '80 - 180', status: plr > 180 ? 'high' : 'normal', statusLabel: plr > 180 ? 'Elevado (> 180)' : 'Normal' }
+          ],
+          interpretation: interp,
+          steps: [
+            `NLR = ${neu} / ${linf} = ${nlr}`,
+            `PLR = ${plt} / ${linf} = ${plr}`
+          ]
+        };
+      } catch (err) {
+        return { results: [], interpretation: 'Ingrese valores numéricos válidos.' };
       }
-
-      const nlr = Number((neu / linf).toFixed(2));
-      const plr = plt ? Number((plt / linf).toFixed(1)) : 0;
-
-      let nlrStatus: 'normal' | 'high' | 'critical-high' = 'normal';
-      let nlrLabel = 'Normal (< 3.0)';
-      let interp = '';
-
-      if (nlr < 3.0) {
-        nlrStatus = 'normal';
-        interp = 'NLR normal: Sin evidencia de respuesta inflamatoria sistémica marcada.';
-      } else if (nlr <= 6.0) {
-        nlrStatus = 'high';
-        nlrLabel = 'Inflamación Leve a Moderada (3.0 - 6.0)';
-        interp = 'NLR moderadamente elevado: Sugiere estrés fisiológico, infección bacteriana o inflamación sistémica activa.';
-      } else {
-        nlrStatus = 'critical-high';
-        nlrLabel = 'Inflamación Severa / Alto Riesgo (> 6.0)';
-        interp = 'NLR marcadamente elevado: Alto riesgo de sepsis, tormenta de citoquinas o descompensación crítica.';
-      }
-
-      return {
-        results: [
-          { id: 'nlr', name: 'Relación Neutrófilo/Linfocito (NLR)', value: nlr, unit: 'ratio', referenceRange: '1.0 - 3.0', status: nlrStatus, statusLabel: nlrLabel },
-          { id: 'plr', name: 'Relación Plaqueta/Linfocito (PLR)', value: plr, unit: 'ratio', referenceRange: '80 - 180', status: plr > 180 ? 'high' : 'normal' }
-        ],
-        interpretation: interp,
-        steps: [
-          `NLR = ${neu} / ${linf} = ${nlr}`,
-          `PLR = ${plt} / ${linf} = ${plr}`
-        ]
-      };
     }
   }
 ];

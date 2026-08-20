@@ -131,9 +131,22 @@ export const CalculatorCard: React.FC<CalculatorCardProps> = ({
       calculation.results.map(r => `${r.name}: ${r.value} ${r.unit} [${r.referenceRange || 'Ref: N/A'}]`).join('\n') +
       `\n\nInterpretación Clínica:\n${calculation.interpretation}`;
     
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn('Copy not supported:', err);
+    }
   };
 
   const handleSaveToReport = () => {
@@ -389,7 +402,7 @@ export const CalculatorCard: React.FC<CalculatorCardProps> = ({
 
                     <div className="flex items-baseline gap-2 pt-1">
                       <span className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-sky-400">
-                        {typeof res.value === 'number' ? res.value.toLocaleString() : res.value}
+                        {typeof res.value === 'number' && !isNaN(res.value) ? res.value.toLocaleString() : String(res.value ?? '')}
                       </span>
                       <span className="text-xs font-bold text-slate-400">
                         {res.unit}
